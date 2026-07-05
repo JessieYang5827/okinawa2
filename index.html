@@ -24,7 +24,7 @@
 <div id="app"></div>
 
 <script>
-const { ref, computed, watch } = Vue;
+const { createApp, ref, reactive, computed, watch } = Vue;
 
 const STORAGE_KEY = "okinawa-trip-2026-07-web";
 
@@ -37,56 +37,107 @@ const CATEGORIES = [
   { key: "other", label: "其他", emoji: "✨", color: "#345670" },
 ];
 
-const DEFAULT_DAYS = [
-  { date: "7/20", weekday: "一", items: [] },
-  { date: "7/21", weekday: "二", items: [] },
-  { date: "7/22", weekday: "三", items: [] },
-  { date: "7/23", weekday: "四", items: [] },
-  { date: "7/24", weekday: "五", items: [] },
+const TAX_OPTIONS = ["內稅 (10%)", "內稅 (8%)", "外稅", "免稅"];
+
+const FLIGHTS = [
+  { type: "去程", date: "7/20", weekday: "一", duration: "1小時25分",
+    fromTime: "13:30", fromPlace: "TPE 台北 臺灣桃園國際機場 T1",
+    toTime: "15:55", toPlace: "OKA 沖繩 那霸機場",
+    airline: "泰國亞航 FD230", aircraft: "空中巴士 A321neo", cabin: "經濟艙" },
+  { type: "回程", date: "7/24", weekday: "五", duration: "1小時35分",
+    fromTime: "16:55", fromPlace: "OKA 沖繩 那霸機場",
+    toTime: "17:30", toPlace: "TPE 台北 臺灣桃園國際機場 T1",
+    airline: "泰國亞航 FD231", aircraft: "空中巴士 A321neo", cabin: "經濟艙" },
 ];
 
-function load() {
+const DEFAULT_DAYS = [
+  { date: "7/20", weekday: "一", title: "", hotel: "蒙特利拉蘇瑞那霸酒店",
+    note: "下飛機領完行李後，前往單軌電車「那霸機場」站，並購票前往「縣廳前」站（票價：¥250）",
+    itinerary: [
+      { time: "08:00", place: "🏠 出發" },
+      { time: "10:30", place: "TPE 台灣桃園國際機場" },
+      { time: "13:30", place: "🛫 起飛" },
+      { time: "15:55", place: "🛬 抵達 OKA 沖繩那霸機場" },
+      { time: "17:40", place: "（搭乘單軌電車）那霸機場－縣廳前站" },
+      { time: "18:00", place: "入住飯店" }
+    ],
+    items: [] },
+  { date: "7/21", weekday: "二", title: "", hotel: "", note: "",
+    itinerary: [], items: [] },
+  { date: "7/22", weekday: "三", title: "", hotel: "", note: "",
+    itinerary: [], items: [] },
+  { date: "7/23", weekday: "四", title: "", hotel: "", note: "",
+    itinerary: [], items: [] },
+  { date: "7/24", weekday: "五", title: "", hotel: "", note: "",
+    itinerary: [
+      { time: "16:55", place: "OKA 出發 ✈️" },
+      { time: "17:30", place: "抵達 TPE ✈️" }
+    ],
+    items: [] },
+];
+
+function uid() {
+  return Math.random().toString(36).slice(2, 10);
+}
+
+function loadState() {
   try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY));
-  } catch {
-    return null;
-  }
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch (e) {}
+  return null;
 }
 
 const App = {
   setup() {
-    const saved = load();
+    const saved = loadState();
 
-    const days = ref(saved?.days || DEFAULT_DAYS);
-    const rate = ref(saved?.rate || 0.21);
+    const rate = ref(saved?.rate ?? 0.21);
     const rateInput = ref(String(rate.value));
+
+    const days = ref(saved?.days ?? JSON.parse(JSON.stringify(DEFAULT_DAYS)));
 
     const activeDay = ref(0);
 
-    const newName = ref("");
-    const newAmount = ref("");
-    const newCategory = ref("food");
+    const newItemShop = ref("");
+    const newItemName = ref("");
+    const newItemAmount = ref("");
+    const newItemTax = ref("內稅 (10%)");
+    const newItemCategory = ref(CATEGORIES[0].key);
 
-    watch([days, rate], () => {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        days: days.value,
-        rate: rate.value
-      }));
+    let saveTimer = null;
+
+    watch([rate, days], () => {
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(() => {
+        localStorage.setItem(
+          STORAGE_KEY,
+          JSON.stringify({ rate: rate.value, days: days.value })
+        );
+      }, 200);
     }, { deep: true });
 
+    function applyRate() {
+      const v = parseFloat(rateInput.value);
+      if (!isNaN(v) && v > 0) rate.value = v;
+    }
+
     function addItem() {
-      const amt = parseFloat(newAmount.value);
-      if (!newName.value || isNaN(amt)) return;
+      const amt = parseFloat(newItemAmount.value);
+      if (!newItemName.value || isNaN(amt)) return;
 
       days.value[activeDay.value].items.push({
-        id: Date.now(),
-        name: newName.value,
+        id: uid(),
+        shop: newItemShop.value || "未指定",
+        name: newItemName.value,
         amount: amt,
-        category: newCategory.value
+        tax: newItemTax.value,
+        category: newItemCategory.value
       });
 
-      newName.value = "";
-      newAmount.value = "";
+      newItemShop.value = "";
+      newItemName.value = "";
+      newItemAmount.value = "";
     }
 
     function removeItem(i) {
@@ -95,88 +146,109 @@ const App = {
 
     const totalJPY = computed(() =>
       days.value.reduce((s, d) =>
-        s + d.items.reduce((a, b) => a + Number(b.amount), 0), 0)
+        s + d.items.reduce((a, b) => a + Number(b.amount), 0), 0
+      )
     );
 
     const totalTWD = computed(() =>
       Math.round(totalJPY.value * rate.value)
     );
 
-    function applyRate() {
-      const v = parseFloat(rateInput.value);
-      if (v > 0) rate.value = v;
-    }
-
     function cat(key) {
-      return CATEGORIES.find(c => c.key === key);
+      return CATEGORIES.find(c => c.key === key) || CATEGORIES[0];
     }
 
     return {
-      days, rate, rateInput, activeDay,
-      newName, newAmount, newCategory,
-      addItem, removeItem,
-      totalJPY, totalTWD,
-      applyRate, cat, CATEGORIES
+      days,
+      rate,
+      rateInput,
+      activeDay,
+      newItemShop,
+      newItemName,
+      newItemAmount,
+      newItemTax,
+      newItemCategory,
+      applyRate,
+      addItem,
+      removeItem,
+      totalJPY,
+      totalTWD,
+      cat,
+      CATEGORIES,
+      FLIGHTS
     };
   },
 
   template: `
-  <div style="padding:16px">
+  <div class="px-4 py-4">
 
-    <h2 style="font-size:20px;font-weight:bold;">
+    <div class="text-xl font-bold mb-2">
       上班沒精神 下班飛沖繩
-    </h2>
+    </div>
 
-    <div style="margin:10px 0;">
+    <div class="mb-2">
       💰 ¥{{ totalJPY }} ≈ NT$ {{ totalTWD }}
     </div>
 
-    <div style="margin-bottom:10px;">
+    <div class="mb-3">
       匯率：
-      <input v-model="rateInput" style="width:60px;border:1px solid #ccc;">
-      <button @click="applyRate">OK</button>
+      <input v-model="rateInput" class="border px-2 w-16">
+      <button @click="applyRate">套用</button>
     </div>
 
-    <div style="display:flex;gap:6px;margin-bottom:10px;">
-      <button v-for="(d,i) in days" :key="i"
+    <div class="flex gap-2 mb-3 overflow-x-auto">
+      <button v-for="(d,i) in days"
         @click="activeDay=i"
-        :style="{padding:'6px',border: activeDay===i?'2px solid #000':'1px solid #ccc'}">
-        Day {{i+1}}
+        class="px-2 py-1 border"
+        :class="activeDay===i ? 'bg-black text-white' : ''">
+        Day {{ i+1 }}
       </button>
     </div>
 
-    <div>
-      <h3>{{ days[activeDay].date }}</h3>
+    <div class="mb-4">
+      <h3 class="font-bold">{{ days[activeDay].date }}</h3>
 
       <div v-for="(item,i) in days[activeDay].items" :key="item.id">
         {{ cat(item.category).emoji }} {{ item.name }} ¥{{ item.amount }}
         <button @click="removeItem(i)">✕</button>
       </div>
 
-      <input v-model="newName" placeholder="品項">
-      <input v-model="newAmount" placeholder="金額">
-      
-      <select v-model="newCategory">
-        <option v-for="c in CATEGORIES" :value="c.key">
-          {{ c.emoji }} {{ c.label }}
-        </option>
-      </select>
+      <div class="mt-2">
+        <input v-model="newItemShop" placeholder="店名">
+        <input v-model="newItemName" placeholder="品項">
+        <input v-model="newItemAmount" placeholder="金額">
 
-      <button @click="addItem">新增</button>
+        <select v-model="newItemCategory">
+          <option v-for="c in CATEGORIES" :value="c.key">
+            {{ c.emoji }} {{ c.label }}
+          </option>
+        </select>
+
+        <button @click="addItem">新增</button>
+      </div>
     </div>
 
   </div>
   `
 };
+</script>
 
-function boot() {
-  const el = document.getElementById("app");
-  if (!el || !window.Vue) return setTimeout(boot, 50);
+<script>
+(function boot() {
+  function mount() {
+    const el = document.getElementById("app");
+    if (!el || !window.Vue?.createApp) {
+      return setTimeout(mount, 50);
+    }
+    window.Vue.createApp(App).mount("#app");
+  }
 
-  Vue.createApp(App).mount("#app");
-}
-
-boot();
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", mount);
+  } else {
+    mount();
+  }
+})();
 </script>
 
 </body>
