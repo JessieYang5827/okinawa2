@@ -4,10 +4,13 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>上班沒精神 下班飛沖繩</title>
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+
 <style>
   body { font-family: 'Noto Sans TC', sans-serif; }
   .font-display { font-family: 'Zen Maru Gothic', sans-serif; }
@@ -15,11 +18,18 @@
   ::-webkit-scrollbar { display: none; }
 </style>
 </head>
+
 <body class="bg-[#F5E7CB] text-[#33475A] pb-10 min-h-screen">
-<div id="app"></div>
+
+<div id="app">
+  <!-- fallback，避免 Vue 沒載到時整頁空白 -->
+  <div style="padding:20px;text-align:center;color:#666;">
+    載入中...
+  </div>
+</div>
 
 <script>
-const { createApp, ref, reactive, computed, onMounted, watch } = Vue;
+const { createApp, ref, reactive, computed, watch } = Vue;
 
 const STORAGE_KEY = "okinawa-trip-2026-07-web";
 
@@ -34,58 +44,22 @@ const CATEGORIES = [
 
 const TAX_OPTIONS = ["內稅 (10%)", "內稅 (8%)", "外稅", "免稅"];
 
-const FLIGHTS = [
-  { type: "去程", date: "7/20", weekday: "一", duration: "1小時25分",
-    fromTime: "13:30", fromPlace: "TPE 台北 臺灣桃園國際機場 T1",
-    toTime: "15:55", toPlace: "OKA 沖繩 那霸機場",
-    airline: "泰國亞航 FD230", aircraft: "空中巴士 A321neo", cabin: "經濟艙" },
-  { type: "回程", date: "7/24", weekday: "五", duration: "1小時35分",
-    fromTime: "16:55", fromPlace: "OKA 沖繩 那霸機場",
-    toTime: "17:30", toPlace: "TPE 台北 臺灣桃園國際機場 T1",
-    airline: "泰國亞航 FD231", aircraft: "空中巴士 A321neo", cabin: "經濟艙" },
-];
-
 const DEFAULT_DAYS = [
-  { date: "7/20", weekday: "一", title: "", hotel: "蒙特利拉蘇瑞那霸酒店",
-    note: "下飛機領完行李後，前往單軌電車「那霸機場」站，並購票前往「縣廳前」站（票價：¥250）",
-    itinerary: [
-      { time: "08:00", place: "🏠 出發" },
-      { time: "10:30", place: "TPE 台灣桃園國際機場" },
-      { time: "13:30", place: "🛫 起飛" },
-      { time: "15:55", place: "🛬 抵達 OKA 沖繩那霸機場" },
-      { time: "16:55-17:25", place: "（需1-1.5小時）\n入境＋拿行李出關" },
-      { time: "17:40-18:00", place: "（搭乘單軌電車）\n那霸機場－縣廳前站" },
-      { time: "18:00-18:20", place: "（步行辦理入住）\n蒙特利拉蘇瑞那霸酒店" },
-      { time: "18:20-19:00", place: "行李就定位＋休息" },
-      { time: "19:00-23:00", place: "國際通" },
-    ], items: [] },
-  { date: "7/21", weekday: "二", title: "", hotel: "", note: "",
-    itinerary: [
-      { time: "06:30", place: "起床" },
-      { time: "07:10", place: "退房＋大廳寄放行李" },
-      { time: "07:15", place: "走路到 ABEST 飯店" },
-      { time: "07:30", place: "接駁車到達" },
-      { time: "08:00", place: "抵達 BERRY 那霸店" },
-      { time: "16:00-17:00", place: "結束潛水" },
-    ], items: [] },
+  { date: "7/20", weekday: "一", title: "", hotel: "蒙特利拉蘇瑞那霸酒店", note: "", itinerary: [], items: [] },
+  { date: "7/21", weekday: "二", title: "", hotel: "", note: "", itinerary: [], items: [] },
   { date: "7/22", weekday: "三", title: "", hotel: "", note: "", itinerary: [], items: [] },
   { date: "7/23", weekday: "四", title: "", hotel: "", note: "", itinerary: [], items: [] },
-  { date: "7/24", weekday: "五", title: "", hotel: "", note: "",
-    itinerary: [
-      { time: "16:55", place: "OKA 沖繩那霸機場 出發 ✈️（泰國亞航 FD231）" },
-      { time: "17:30", place: "抵達 TPE 台北臺灣桃園國際機場 T1 ✈️" },
-    ], items: [] },
+  { date: "7/24", weekday: "五", title: "", hotel: "", note: "", itinerary: [], items: [] },
 ];
 
-function uid() { return Math.random().toString(36).slice(2, 10); }
+function uid() {
+  return Math.random().toString(36).slice(2, 10);
+}
 
 function loadState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (parsed.days && parsed.rate) return parsed;
-    }
+    if (raw) return JSON.parse(raw);
   } catch (e) {}
   return null;
 }
@@ -93,60 +67,57 @@ function loadState() {
 const App = {
   setup() {
     const saved = loadState();
-    const rate = ref(saved ? saved.rate : 0.21);
-    const rateInput = ref(String(rate.value));
-    const days = ref(saved ? saved.days : JSON.parse(JSON.stringify(DEFAULT_DAYS)).map(d => ({
-      ...d, itinerary: d.itinerary.map(it => ({ id: uid(), ...it })),
-      items: (d.items || []).map(i => ({ id: uid(), shop: "", tax: "內稅 (10%)", ...i })),
-    })));
-    const activeDay = ref(0);
-    const saveState = ref("idle");
 
-    // 新增花費的臨時表單欄位
+    const rate = ref(saved?.rate ?? 0.21);
+    const rateInput = ref(String(rate.value));
+
+    const days = ref(
+      saved?.days ??
+      DEFAULT_DAYS.map(d => ({
+        ...d,
+        itinerary: [],
+        items: []
+      }))
+    );
+
+    const activeDay = ref(0);
+
     const newItemShop = ref("");
     const newItemName = ref("");
     const newItemAmount = ref("");
     const newItemTax = ref("內稅 (10%)");
     const newItemCategory = ref(CATEGORIES[0].key);
 
-    let saveTimer = null;
-    function persist() {
-      saveState.value = "saving";
-      clearTimeout(saveTimer);
-      saveTimer = setTimeout(() => {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify({ rate: rate.value, days: days.value }));
-        saveState.value = "saved";
-      }, 300);
-    }
-    watch([rate, days], persist, { deep: true });
+    watch([rate, days], () => {
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ rate: rate.value, days: days.value })
+      );
+    }, { deep: true });
 
     function applyRate() {
       const v = parseFloat(rateInput.value);
       if (!isNaN(v) && v > 0) rate.value = v;
     }
 
-    function addScheduleRow(idx) {
-      days.value[idx].itinerary.push({ id: uid(), time: "", place: "" });
-    }
-    function removeScheduleRow(idx, id) {
-      days.value[idx].itinerary = days.value[idx].itinerary.filter(r => r.id !== id);
-    }
-
     function addItem(idx) {
       const amt = parseFloat(newItemAmount.value);
-      if (!newItemName.value.trim() || isNaN(amt) || amt <= 0) return;
+      if (!newItemName.value || isNaN(amt)) return;
+
       days.value[idx].items.push({
         id: uid(),
-        shop: newItemShop.value.trim() || "未指定店家",
-        name: newItemName.value.trim(),
+        shop: newItemShop.value || "未指定",
+        name: newItemName.value,
         amount: amt,
         tax: newItemTax.value,
         category: newItemCategory.value
       });
+
       newItemShop.value = "";
       newItemName.value = "";
       newItemAmount.value = "";
     }
+
     function removeItem(idx, id) {
       days.value[idx].items = days.value[idx].items.filter(i => i.id !== id);
     }
@@ -154,310 +125,84 @@ const App = {
     function dayTotal(day) {
       return day.items.reduce((s, i) => s + Number(i.amount || 0), 0);
     }
-    const grandTotalJPY = computed(() => days.value.reduce((s, d) => s + dayTotal(d), 0));
-    const grandTotalTWD = computed(() => Math.round(grandTotalJPY.value * rate.value));
 
-    function categoryOf(key) {
-      return CATEGORIES.find(c => c.key === key) || CATEGORIES[CATEGORIES.length - 1];
-    }
+    const grandTotalJPY = computed(() =>
+      days.value.reduce((s, d) => s + dayTotal(d), 0)
+    );
 
-    function mapsLink(place) {
-      const firstLine = (place || "").split("\n")[0].replace(/[🏠🛫🛬✈️🚌]/g, "").trim();
-      return "https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent(firstLine || place);
-    }
+    const grandTotalTWD = computed(() =>
+      Math.round(grandTotalJPY.value * rate.value)
+    );
 
     function fmtTWD(n) {
       return Math.round(n).toLocaleString();
     }
 
-    // 計算各分類總金額（圓餅圖用）
-    const categoryTotals = computed(() => {
-      const totals = {};
-      CATEGORIES.forEach(c => totals[c.key] = 0);
-      days.value.forEach(d => {
-        d.items.forEach(i => {
-          if (totals[i.category] !== undefined) {
-            totals[i.category] += Number(i.amount || 0);
-          }
-        });
-      });
-      return totals;
-    });
-
-    // 計算圓餅圖 SVG 路徑
-    const pieSlices = computed(() => {
-      const total = Object.values(categoryTotals.value).reduce((a, b) => a + b, 0);
-      if (total === 0) return [];
-
-      let accumulatedAngle = 0;
-      return CATEGORIES.map(c => {
-        const value = categoryTotals.value[c.key];
-        if (value === 0) return null;
-
-        const percentage = value / total;
-        const angle = percentage * 360;
-        
-        // 計算弧線起點與終點座標 (半徑 50, 中心點 50,50)
-        const x1 = 50 + 50 * Math.cos((accumulatedAngle - 90) * Math.PI / 180);
-        const y1 = 50 + 50 * Math.sin((accumulatedAngle - 90) * Math.PI / 180);
-        
-        accumulatedAngle += angle;
-        
-        const x2 = 50 + 50 * Math.cos((accumulatedAngle - 90) * Math.PI / 180);
-        const y2 = 50 + 50 * Math.sin((accumulatedAngle - 90) * Math.PI / 180);
-        
-        const largeArcFlag = angle > 180 ? 1 : 0;
-        const pathData = `M 50 50 L ${x1} ${y1} A 50 50 0 ${largeArcFlag} 1 ${x2} ${y2} Z`;
-        
-        return {
-          key: c.key,
-          label: c.label,
-          color: c.color,
-          pathData,
-          percentage: (percentage * 100).toFixed(1),
-          value
-        };
-      }).filter(Boolean);
-    });
+    function categoryOf(key) {
+      return CATEGORIES.find(c => c.key === key) || CATEGORIES[0];
+    }
 
     return {
-      rate, rateInput, days, activeDay, saveState, CATEGORIES, TAX_OPTIONS, FLIGHTS,
-      newItemShop, newItemName, newItemAmount, newItemTax, newItemCategory,
-      applyRate, addScheduleRow, removeScheduleRow, addItem, removeItem,
-      dayTotal, grandTotalJPY, grandTotalTWD, categoryOf, mapsLink, fmtTWD,
-      categoryTotals, pieSlices
+      days,
+      activeDay,
+      rate,
+      rateInput,
+      applyRate,
+      newItemShop,
+      newItemName,
+      newItemAmount,
+      newItemTax,
+      newItemCategory,
+      addItem,
+      removeItem,
+      dayTotal,
+      grandTotalJPY,
+      grandTotalTWD,
+      fmtTWD,
+      categoryOf,
+      CATEGORIES,
+      TAX_OPTIONS
     };
   },
+
   template: `
-  <div>
-    <div class="bg-[#487196] text-white px-5 pt-7 pb-10 relative overflow-hidden">
-      <div class="relative z-10">
-        <div class="font-display font-black text-2xl tracking-wide">上班沒精神 下班飛沖繩</div>
-        <div class="opacity-85 text-sm mt-1">5天4夜・7/20（一）— 7/24（五）</div>
-      </div>
-      <svg viewBox="0 0 400 40" preserveAspectRatio="none" class="absolute -bottom-px left-0 w-full h-10">
-        <path d="M0,20 C50,35 100,5 150,20 C200,35 250,5 300,20 C350,35 380,15 400,20 L400,40 L0,40 Z" fill="#F5E7CB"/>
-      </svg>
+  <div style="padding:20px">
+    <h1 style="font-weight:bold;font-size:20px;margin-bottom:10px;">
+      上班沒精神 下班飛沖繩
+    </h1>
+
+    <div style="margin-bottom:10px;">
+      💰 總花費：¥{{ grandTotalJPY }} ≈ NT$ {{ fmtTWD(grandTotalTWD) }}
     </div>
 
-    <div class="px-4 -mt-5 relative z-10 grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
-      
-      <div class="md:col-span-1 flex flex-col gap-3">
-        <div class="bg-white rounded-2xl px-4 py-4 shadow flex justify-between items-center">
-          <div>
-            <div class="text-xs text-[#7C8B96] mb-0.5">旅程總花費</div>
-            <div class="font-display font-bold text-xl text-[#487196]">¥{{ grandTotalJPY.toLocaleString() }}</div>
-            <div class="text-sm font-bold text-[#A64D3D] mt-0.5">≈ NT${{ fmtTWD(grandTotalTWD) }}</div>
-          </div>
-          <div class="text-3xl">💰</div>
-        </div>
-
-        <div class="bg-white rounded-2xl px-4 py-4 shadow">
-          <div class="text-sm font-bold mb-3 flex items-center gap-1.5">📊 全行程花費比例</div>
-          <div v-if="grandTotalJPY === 0" class="text-xs text-center text-[#7C8B96] py-6">
-            尚無花費資料，請先於下方新增明細
-          </div>
-          <div v-else class="flex flex-col items-center gap-4">
-            <div class="w-36 h-36 relative">
-              <svg viewBox="0 0 100 100" class="w-full h-full transform -rotate-90">
-                <path v-for="slice in pieSlices" :key="slice.key" :d="slice.pathData" :fill="slice.color" />
-              </svg>
-            </div>
-            <div class="grid grid-cols-2 gap-x-4 gap-y-1.5 w-full text-xs">
-              <div v-for="slice in pieSlices" :key="slice.key" class="flex items-center gap-1.5">
-                <span class="w-2.5 h-2.5 rounded-full shrink-0" :style="{ backgroundColor: slice.color }"></span>
-                <span class="truncate text-[#33475A]">{{ slice.label }}</span>
-                <span class="font-bold ml-auto text-gray-500">{{ slice.percentage }}%</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="bg-white rounded-2xl px-4 py-3 shadow flex items-center gap-2 text-sm">
-          <span class="text-[#7C8B96] whitespace-nowrap">匯率：1 日圓 =</span>
-          <input v-model="rateInput" @blur="applyRate" @keydown.enter="applyRate"
-            class="w-16 border-2 border-[#E6D3A0] rounded-lg px-2 py-1 font-bold text-[#487196] outline-none" />
-          <span class="text-[#7C8B96]">台幣</span>
-          <button @click="applyRate" class="ml-auto bg-[#487196] text-white rounded-lg px-3 py-1.5 text-sm font-bold">套用</button>
-        </div>
-
-        <div class="bg-white rounded-2xl px-4 pt-3.5 pb-1 shadow">
-          <div class="flex items-center gap-1.5 text-sm font-bold mb-2">✈️ 航班資訊</div>
-          <div v-for="(f, i) in FLIGHTS" :key="i" class="pb-4" :class="i === FLIGHTS.length -1 ? 'pb-2' : ''">
-            <div class="flex items-center gap-2 mb-2">
-              <span class="text-xs font-bold text-white rounded px-2 py-0.5"
-                :class="f.type === '回程' ? 'bg-[#7ABBD4] !text-[#33475A]' : 'bg-[#487196]'">{{ f.type }}</span>
-              <span class="text-sm font-bold">{{ f.date }}（{{ f.weekday }}）</span>
-              <span class="text-xs text-[#7C8B96] ml-auto">飛行 {{ f.duration }}</span>
-            </div>
-            <div class="flex gap-2.5">
-              <div class="flex flex-col items-center w-2.5">
-                <div class="w-2 h-2 rounded-full" :class="f.type === '回程' ? 'bg-[#7ABBD4]' : 'bg-[#487196]'"></div>
-                <div class="flex-1 w-0.5 bg-[#E6D3A0] my-0.5"></div>
-                <div class="w-2 h-2 rounded-full" :class="f.type === '回程' ? 'bg-[#7ABBD4]' : 'bg-[#487196]'"></div>
-              </div>
-              <div class="flex-1 min-w-0 text-sm">
-                <div class="flex gap-2"><span class="font-bold w-11 shrink-0">{{ f.fromTime }}</span><span>{{ f.fromPlace }}</span></div>
-                <div class="h-2.5"></div>
-                <div class="flex gap-2"><span class="font-bold w-11 shrink-0">{{ f.toTime }}</span><span>{{ f.toPlace }}</span></div>
-                <div class="text-xs text-[#7C8B96] mt-2">{{ f.airline }}｜{{ f.aircraft }}｜{{ f.cabin }}</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="md:col-span-2 flex flex-col gap-3">
-        <div class="flex gap-2 overflow-x-auto pb-1">
-          <button v-for="(d, idx) in days" :key="idx" @click="activeDay = idx"
-            class="shrink-0 min-w-[64px] px-3 py-2 rounded-2xl text-left shadow-sm"
-            :class="activeDay === idx ? 'bg-[#A64D3D] text-white shadow-lg' : 'bg-white text-[#33475A]'">
-            <div class="text-[11px] opacity-85">Day{{ idx + 1 }}</div>
-            <div class="text-sm font-bold">{{ d.date }}（{{ d.weekday }}）</div>
-          </button>
-        </div>
-
-        <div class="bg-white rounded-2xl p-4 shadow" v-if="days[activeDay]">
-          <div class="text-xs text-[#7C8B96] font-bold mb-2">🗺️ 景點行程規劃</div>
-          <input v-model="days[activeDay].title" placeholder="這天行程重點（例如：美麗海水族館、國際通）"
-            class="w-full border-0 border-b-2 border-dashed border-[#E6D3A0] pb-2 text-[15px] font-bold text-[#487196] outline-none font-display" />
-
-          <div class="flex items-center gap-2 mt-2.5">
-            <span>🏨</span>
-            <input v-model="days[activeDay].hotel" placeholder="住宿飯店名稱"
-              class="flex-1 border-0 border-b border-[#E6D3A0] py-1 text-sm font-semibold outline-none" />
-          </div>
-
-          <textarea v-model="days[activeDay].note" placeholder="備註（車票、注意事項等，可留空）" rows="2"
-            class="w-full mt-2.5 border-2 border-[#E6D3A0] rounded-lg px-2.5 py-2 text-xs text-[#7C8B96] outline-none bg-[#F5E7CB]"></textarea>
-
-          <div class="mt-3.5">
-            <div class="flex text-[11px] font-bold text-white bg-[#487196] rounded-t-lg overflow-hidden">
-              <div class="w-24 px-2.5 py-1.5">時間</div>
-              <div class="flex-1 px-2.5 py-1.5">地點</div>
-              <div class="w-14"></div>
-            </div>
-            <div class="border-2 border-t-0 border-[#E6D3A0] rounded-b-lg overflow-hidden">
-              <div v-if="days[activeDay].itinerary.length === 0" class="text-xs text-[#7C8B96] p-2.5">
-                還沒有安排時間表，點下方「新增時段」加入。
-              </div>
-              <div v-for="(row, i) in days[activeDay].itinerary" :key="row.id"
-                class="flex items-stretch" :class="i !== 0 ? 'border-t border-[#E6D3A0]' : ''">
-                <input v-model="row.time" placeholder="08:00"
-                  class="w-24 border-0 border-r border-[#E6D3A0] px-2.5 py-2 text-xs font-bold text-[#487196] outline-none bg-transparent" />
-                <textarea v-model="row.place" placeholder="地點 / 行程內容" rows="1"
-                  class="flex-1 min-w-0 border-0 px-2.5 py-2 text-sm outline-none bg-transparent leading-relaxed"></textarea>
-                <a :href="mapsLink(row.place)" target="_blank"
-                  class="w-7 flex items-center justify-center text-[#7C8B96]" title="在Google地圖開啟">📍</a>
-                <button @click="removeScheduleRow(activeDay, row.id)" class="w-7 text-[#7C8B96]">✕</button>
-              </div>
-            </div>
-            <button @click="addScheduleRow(activeDay)"
-              class="mt-2 w-full flex items-center justify-center gap-1.5 py-2 rounded-lg border-2 border-dashed border-[#E6D3A0] text-[#487196] text-xs font-bold">
-              + 新增時段
-            </button>
-          </div>
-        </div>
-
-        <div class="bg-white rounded-2xl p-4 shadow" v-if="days[activeDay]">
-          <div class="text-xs font-bold text-[#A64D3D] flex items-center justify-between border-b pb-2 mb-3">
-            <span>💰 當日花費與記帳</span>
-            <span class="text-sm font-bold text-[#487196]" v-if="days[activeDay].items.length > 0">
-              今日小計: ¥{{ dayTotal(days[activeDay]).toLocaleString() }} (≈NT\${{ fmtTWD(dayTotal(days[activeDay]) * rate) }})
-            </span>
-          </div>
-
-          <div class="flex flex-wrap gap-2 mb-4">
-            <div v-for="item in days[activeDay].items" :key="item.id"
-              class="flex items-center gap-2 px-2.5 py-1.5 rounded-full bg-[#F5E7CB] text-xs">
-              <span>{{ categoryOf(item.category).emoji }} {{ item.name }} (¥{{ Number(item.amount).toLocaleString() }})</span>
-              <button @click="removeItem(activeDay, item.id)" class="text-[#7C8B96] hover:text-red-500 font-bold ml-1">✕</button>
-            </div>
-            <div v-if="days[activeDay].items.length === 0" class="text-xs text-[#7C8B96] py-1">
-              暫無今日花費快看。
-            </div>
-          </div>
-
-          <div class="mt-4">
-            <div class="text-xs font-bold text-gray-500 mb-2">📋 消費明細表</div>
-            <div class="border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-              <table class="w-full text-left border-collapse bg-white text-xs">
-                <thead>
-                  <tr class="bg-gray-50 border-b border-gray-200 font-bold text-gray-600">
-                    <th class="p-2.5">分類</th>
-                    <th class="p-2.5">店名</th>
-                    <th class="p-2.5">品項</th>
-                    <th class="p-2.5">稅別</th>
-                    <th class="p-2.5 text-right">金額</th>
-                    <th class="p-2.5 text-center w-10"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-if="days[activeDay].items.length === 0">
-                    <td colspan="6" class="p-4 text-center text-gray-400">目前沒有明細紀錄，請由下方新增。</td>
-                  </tr>
-                  <tr v-for="item in days[activeDay].items" :key="item.id" class="border-b border-gray-100 hover:bg-gray-50">
-                    <td class="p-2.5 font-medium">
-                      {{ categoryOf(item.category).emoji }} {{ categoryOf(item.category).label }}
-                    </td>
-                    <td class="p-2.5 text-gray-700 max-w-[100px] truncate" :title="item.shop">{{ item.shop }}</td>
-                    <td class="p-2.5 font-semibold text-[#33475A]">{{ item.name }}</td>
-                    <td class="p-2.5">
-                      <span class="px-1.5 py-0.5 rounded text-[10px] bg-gray-100 text-gray-600">{{ item.tax || '內稅' }}</span>
-                    </td>
-                    <td class="p-2.5 text-right font-bold text-[#487196]">
-                      <div>¥{{ Number(item.amount).toLocaleString() }}</div>
-                      <div class="text-[10px] text-[#A64D3D] font-normal">≈NT\${{ fmtTWD(item.amount * rate) }}</div>
-                    </td>
-                    <td class="p-2.5 text-center">
-                      <button @click="removeItem(activeDay, item.id)" class="text-gray-400 hover:text-red-500">✕</button>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <div class="mt-4 border-t border-[#E6D3A0] pt-3 bg-gray-50 p-3 rounded-xl">
-            <div class="text-xs font-bold text-[#33475A] mb-2">➕ 新增一筆消費明細</div>
-            <div class="flex gap-1.5 overflow-x-auto pb-2 mb-2">
-              <button v-for="c in CATEGORIES" :key="c.key" @click="newItemCategory = c.key"
-                class="shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold border-2 whitespace-nowrap"
-                :style="newItemCategory === c.key ? { background: c.color, borderColor: c.color, color: '#33475A' } : { borderColor: '#E6D3A0', color: '#7C8B96' }">
-                {{ c.emoji }} {{ c.label }}
-              </button>
-            </div>
-            
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-2">
-              <input v-model="newItemShop" placeholder="🏪 店名 (例: 隱家拉麵)" 
-                class="border-2 border-[#E6D3A0] rounded-lg px-2.5 py-1.5 text-xs outline-none bg-white" />
-              <input v-model="newItemName" placeholder="🛍️ 品項 (例: 特製豚骨)" @keydown.enter="addItem(activeDay)"
-                class="border-2 border-[#E6D3A0] rounded-lg px-2.5 py-1.5 text-xs outline-none bg-white" />
-              <select v-model="newItemTax" 
-                class="border-2 border-[#E6D3A0] rounded-lg px-2 py-1.5 text-xs outline-none bg-white">
-                <option v-for="opt in TAX_OPTIONS" :key="opt" :value="opt">{{ opt }}</option>
-              </select>
-              <input v-model="newItemAmount" placeholder="¥日圓金額" inputmode="numeric" @keydown.enter="addItem(activeDay)"
-                class="border-2 border-[#E6D3A0] rounded-lg px-2.5 py-1.5 text-xs font-bold text-[#487196] outline-none bg-white" />
-            </div>
-            <button @click="addItem(activeDay)" 
-              class="w-full py-2 rounded-lg bg-[#A64D3D] text-white font-bold text-xs shadow hover:bg-opacity-90">
-              確認加入消費明細
-            </button>
-          </div>
-        </div>
-
-      </div>
+    <div style="margin-bottom:20px;">
+      匯率：
+      <input v-model="rateInput" style="border:1px solid #ccc;width:60px;" />
+      <button @click="applyRate">套用</button>
     </div>
 
-    <div class="text-center text-[11px] text-[#7C8B96] mt-4">
-      {{ saveState === 'saving' ? '儲存中…' : '資料已自動儲存在這個瀏覽器裡' }}
+    <div v-for="(d, idx) in days" :key="idx" style="border:1px solid #ddd;margin-bottom:10px;padding:10px;">
+      <h3>Day {{ idx + 1 }} - {{ d.date }}</h3>
+
+      <div v-for="i in d.items" :key="i.id">
+        {{ categoryOf(i.category).emoji }} {{ i.name }} - ¥{{ i.amount }}
+        <button @click="removeItem(idx, i.id)">X</button>
+      </div>
+
+      <input v-model="newItemShop" placeholder="店名" />
+      <input v-model="newItemName" placeholder="品項" />
+      <input v-model="newItemAmount" placeholder="金額" />
+      <button @click="addItem(idx)">新增</button>
     </div>
   </div>
-  `,
+  `
 };
 
-createApp(App).mount('#app');
+window.addEventListener("DOMContentLoaded", () => {
+  const app = createApp(App);
+  app.mount("#app");
+});
 </script>
+
 </body>
 </html>
